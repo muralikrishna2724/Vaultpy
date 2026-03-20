@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %} — Dashboard{% endblock %}
+
+{% block head %}
+<style>
+  .dash-wrap { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .dash-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 2rem; flex-wrap: gap;
+  }
+
+  .dash-title { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
+  .dash-subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+
+  .count-badge {
+    font-family: var(--mono); font-size: 0.75rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 0.2rem 0.6rem; border-radius: 20px;
+  }
+
+  /* Search bar */
+  .search-wrap { margin-bottom: 1.5rem; position: relative; }
+  .search-wrap input { padding-left: 2.5rem; }
+  .search-icon {
+    position: absolute; left: 0.85rem; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 0.9rem;
+    pointer-events: none;
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center; padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+  .empty h3 { font-size: 1.1rem; margin-bottom: 0.4rem; color: var(--text); }
+
+  /* Entry grid */
+  .entries { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .entry-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.1rem 1.3rem;
+    display: flex; align-items: center; gap: 1rem;
+    transition: border-color 0.15s, transform 0.15s;
+    animation: fadeIn 0.3s ease both;
+  }
+  .entry-card:hover { border-color: rgba(124,106,255,0.4); transform: translateX(3px); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-icon {
+    width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--surface2), var(--border));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; border: 1px solid var(--border);
+  }
+
+  .entry-info { flex: 1; min-width: 0; }
+  .entry-title {
+    font-weight: 700; font-size: 0.95rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .entry-user {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--muted); margin-top: 0.1rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .entry-url {
+    font-size: 0.72rem; color: var(--accent); margin-top: 0.1rem;
+    text-decoration: none; font-family: var(--mono);
+  }
+  .entry-url:hover { text-decoration: underline; }
+
+  .entry-actions { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+
+  .copy-btn {
+    font-family: var(--sans); font-weight: 600; font-size: 0.78rem;
+    padding: 0.4rem 0.85rem; border-radius: 7px;
+    background: rgba(124,106,255,0.12); color: var(--accent);
+    border: 1px solid rgba(124,106,255,0.25);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .copy-btn:hover { background: rgba(124,106,255,0.25); }
+  .copy-btn.copied { background: rgba(0,229,160,0.12); color: var(--accent2); border-color: rgba(0,229,160,0.25); }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-size: 0.85rem; padding: 0.7rem 1.2rem;
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transform: translateY(20px); opacity: 0;
+    transition: all 0.25s ease; pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+</style>
+{% endblock %}
+
+{% block nav %}
+<nav>
+  <div class="logo">
+    <div class="logo-icon">🔐</div>
+    VaultPy
+  </div>
+  <div class="nav-actions">
+    <span class="count-badge">{{ entries|length }} entr{{ "y" if entries|length == 1 else "ies" }}</span>
+    <a href="/add" class="btn btn-primary">+ Add</a>
+    <a href="/lock" class="btn btn-ghost">Lock</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="dash-wrap">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Your Passwords</div>
+      <div class="dash-subtitle">All data encrypted with AES-256-GCM · Argon2id</div>
+    </div>
+  </div>
+
+  {% if entries %}
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search entries..." oninput="filterEntries()" />
+    </div>
+
+    <div class="entries" id="entryList">
+      {% for entry in entries %}
+      <div class="entry-card" data-title="{{ entry.title|lower }}" data-user="{{ entry.username|lower }}">
+        <div class="entry-icon">
+          {{ entry.title[0]|upper }}
+        </div>
+        <div class="entry-info">
+          <div class="entry-title">{{ entry.title }}</div>
+          <div class="entry-user">{{ entry.username }}</div>
+          {% if entry.url %}
+            <a href="{{ entry.url }}" target="_blank" class="entry-url">{{ entry.url }}</a>
+          {% endif %}
+        </div>
+        <div class="entry-actions">
+          <button class="copy-btn" onclick="copyPassword('{{ entry.id }}', this)">
+            Copy
+          </button>
+          <form method="POST" action="/delete/{{ entry.id }}"
+                onsubmit="return confirm('Delete {{ entry.title }}?')">
+            <button type="submit" class="btn btn-danger">✕</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <div class="empty-icon">🗝</div>
+      <h3>No passwords yet</h3>
+      <p>Add your first entry to get started.</p>
+    </div>
+  {% endif %}
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Copy password to clipboard via API, auto-clear after 30s
+  async function copyPassword(id, btn) {
+    try {
+      const res  = await fetch(`/api/password/${id}`);
+      const data = await res.json();
+      await navigator.clipboard.writeText(data.password);
+
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      showToast("✓ Password copied — clears in 30s");
+
+      // Auto-clear clipboard after 30 seconds
+      setTimeout(() => {
+        navigator.clipboard.writeText("");
+        btn.textContent = "Copy";
+        btn.classList.remove("copied");
+      }, 30000);
+
+    } catch (e) {
+      showToast("⚠ Could not copy to clipboard");
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  function filterEntries() {
+    const q = document.getElementById("searchInput").value.toLowerCase();
+    document.querySelectorAll(".entry-card").forEach(card => {
+      const match = card.dataset.title.includes(q) || card.dataset.user.includes(q);
+      card.style.display = match ? "" : "none";
+    });
+  }
+
+  // Auto-lock after 5 minutes of inactivity
+  let lockTimer = setTimeout(() => { window.location.href = "/lock"; }, 5 * 60 * 1000);
+  document.addEventListener("mousemove", resetTimer);
+  document.addEventListener("keypress", resetTimer);
+  function resetTimer() {
+    clearTimeout(lockTimer);
+    lockTimer = setTimeout(() => { window.location.href = "/lock"; }, 5 * 60 * 1000);
+  }
+</script>
+{% endblock %}

@@ -1,23 +1,40 @@
 """
 app.py — Flask application entry point
 ---------------------------------------
-Binds to 127.0.0.1 only — never reachable from outside the machine.
+Runs locally on 127.0.0.1 inside a native pywebview window.
 Run with: python app.py
-Then open: http://localhost:5000
 """
 
 import os
-import webbrowser
+import sys
 import threading
+import time
+import webview
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
 from vault_manager import VaultManager
 
 
-app = Flask(__name__)
-app.secret_key = os.urandom(32)   # Session encryption key, random per run
+# ------------------------------------------------------------------ #
+#  Resource path helper (needed when running as PyInstaller .exe)     #
+# ------------------------------------------------------------------ #
 
-# One VaultManager instance for the whole app session
+def resource_path(rel):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, rel)
+    return os.path.join(os.path.abspath("."), rel)
+
+
+# ------------------------------------------------------------------ #
+#  Flask app setup                                                     #
+# ------------------------------------------------------------------ #
+
+app = Flask(__name__,
+            template_folder=resource_path("templates"),
+            static_folder=resource_path("static"))
+
+app.secret_key = os.urandom(32)
+
 vault = VaultManager()
 
 
@@ -26,7 +43,6 @@ vault = VaultManager()
 # ------------------------------------------------------------------ #
 
 def require_unlocked():
-    """Return redirect if vault is locked, else None."""
     if not vault.is_unlocked:
         return redirect(url_for("unlock"))
     return None
@@ -47,13 +63,10 @@ def index():
 def unlock():
     if request.method == "POST":
         password = request.form.get("master_password", "")
-
         if not vault.vault_exists():
-            # First run — create vault
             vault.create_vault(password)
             session["unlocked"] = True
             return redirect(url_for("dashboard"))
-
         success = vault.unlock(password)
         if success:
             session["unlocked"] = True
@@ -62,7 +75,6 @@ def unlock():
             return render_template("unlock.html",
                                    error="Wrong master password. Try again.",
                                    is_new=False)
-
     is_new = not vault.vault_exists()
     return render_template("unlock.html", is_new=is_new)
 
@@ -81,7 +93,6 @@ def add_entry():
     guard = require_unlocked()
     if guard:
         return guard
-
     if request.method == "POST":
         vault.add_entry(
             title    = request.form.get("title", ""),
@@ -91,7 +102,6 @@ def add_entry():
             notes    = request.form.get("notes", "")
         )
         return redirect(url_for("dashboard"))
-
     return render_template("add_entry.html")
 
 
@@ -111,7 +121,6 @@ def lock():
     return redirect(url_for("unlock"))
 
 
-# API endpoint — used by JS clipboard copy button
 @app.route("/api/password/<entry_id>")
 def get_password(entry_id):
     if not vault.is_unlocked:
@@ -126,12 +135,27 @@ def get_password(entry_id):
 #  Launch                                                             #
 # ------------------------------------------------------------------ #
 
-def open_browser():
-    webbrowser.open("http://127.0.0.1:5000")
+def start_flask():
+    """Run Flask in a background thread."""
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":
-    # Open browser after short delay (server needs to start first)
-    threading.Timer(1.2, open_browser).start()
-    # IMPORTANT: bind to 127.0.0.1 only, never 0.0.0.0
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # Start Flask in background thread
+    flask_thread = threading.Thread(target=start_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Wait briefly for Flask to be ready
+    time.sleep(1)
+
+    # Open native desktop window — no browser, no address bar
+    window = webview.create_window(
+        title     = "VaultPy — Password Manager",
+        url       = "http://127.0.0.1:5000",
+        width     = 1024,
+        height    = 700,
+        min_size  = (800, 600),
+        resizable = True
+    )
+    webview.start()

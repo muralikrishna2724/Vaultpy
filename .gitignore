@@ -9,3 +9,5 @@ ENV/
 .vscode/
 .history/
 *.log
+dist/
+build/

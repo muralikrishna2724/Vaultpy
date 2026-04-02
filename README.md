@@ -4,24 +4,29 @@ VaultPy is a simple, secure, and native-feeling local password manager. Built us
 
 ## Features
 
-- **Local Storage:** Your passwords are encrypted and securely stored locally.
-- **Native Desktop App:** Uses `pywebview` for a seamless desktop experience without the need for an address bar.
-- **Manage Entries:** Add, update, and delete your password entries.
-- **Master Password:** One master password controls access to your entire vault.
+- Local storage — passwords are AES-256-GCM encrypted and stored on your machine
+- Native desktop app via `pywebview` (no browser, no address bar)
+- Add, and delete password entries
+- One master password controls access to your entire vault
+- Auto-locks after 5 minutes of inactivity
+- WebView2 Runtime bundled — no internet required on the target machine
 
-## 🚀 Download
+## Download
 
-You can download the VaultPy setup executable directly with a single click:
+You can download the latest VaultPy setup executable directly:
 👉 **[Download VaultPy_Setup.exe](https://github.com/muralikrishna2724/Vaultpy/releases/latest/download/VaultPy_Setup.exe)**
 
-Alternatively, check out the [Releases page](https://github.com/muralikrishna2724/Vaultpy/releases) for more details.
+Or check the [Releases page](https://github.com/muralikrishna2724/Vaultpy/releases) for all versions.
 
-## Setup
+## Installation Notes
 
-If you prefer to find the installer in the repository, a pre-built Windows executable setup file is available in `files/installer_output/VaultPy_Setup.exe`. Run the installer to easily install VaultPy on your Windows machine.
+The installer bundles the Microsoft WebView2 Runtime and will install it silently if not already present on your m PC.
+
+A pre-built installer is
 
 ## Running from Source
 
-1. Clone the repository.
-2. Install the requirements: `pip install -r files/requirements.txt`.
-3. Run the application: `python files/app.py`.
+iles/app.py`python f. Run: `s.txt`
+3requirement files/tall -r `pip insencies: dependInstallitory
+2. reposClone the 
+1. 

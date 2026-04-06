@@ -169,6 +169,8 @@
 
 {% block scripts %}
 <script>
+  let clipboardTimer = null;
+
   // Copy password to clipboard via API, auto-clear after 30s
   async function copyPassword(id, btn) {
     try {
@@ -176,15 +178,31 @@
       const data = await res.json();
       await navigator.clipboard.writeText(data.password);
 
+      document.querySelectorAll('.copy-btn').forEach(b => {
+        b.textContent = "Copy";
+        b.classList.remove("copied");
+      });
+
       btn.textContent = "Copied!";
       btn.classList.add("copied");
       showToast("✓ Password copied — clears in 30s");
 
+      if (clipboardTimer) clearTimeout(clipboardTimer);
+
       // Auto-clear clipboard after 30 seconds
-      setTimeout(() => {
-        navigator.clipboard.writeText("");
+      clipboardTimer = setTimeout(async () => {
         btn.textContent = "Copy";
         btn.classList.remove("copied");
+        try {
+          await navigator.clipboard.writeText("");
+        } catch (e) {
+          // If clearing fails (e.g., window lost focus), clear when focus returns
+          const clearOnFocus = async () => {
+            try { await navigator.clipboard.writeText(""); } catch (err) {}
+            window.removeEventListener('focus', clearOnFocus);
+          };
+          window.addEventListener('focus', clearOnFocus);
+        }
       }, 30000);
 
     } catch (e) {
